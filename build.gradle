@@ -12,10 +12,10 @@ buildscript {
 apply plugin:'java'
 apply plugin: 'elasticsearch.esplugin'
 apply plugin: 'idea'
-
+apply plugin: 'maven-publish'
 
 group = 'com.softbridge'
-version = '1.0.0-es'+ elasticsearch
+version = '1.0.0-es'+ elasticsearch +"-SNAPSHOT"
 description = "ElasticSearch reverse chidren aggregation plugin"
 
 dependencies {
@@ -41,3 +41,20 @@ esplugin {
 }
 dependencyLicenses.enabled = false
 thirdPartyAudit.enabled = false
+
+publishing {
+
+    repositories {
+        maven {
+            credentials {
+                username 'admin'
+                password 'softbridge2015'
+            }
+            if(project.version.toString().endsWith('-SNAPSHOT')) {
+                url "http://forge.softbridge.fr:8081/artifactory/libs-snapshot-local"
+            } else {
+                url "http://forge.softbridge.fr:8081/artifactory/libs-release-local"
+            }
+        }
+    }
+}
