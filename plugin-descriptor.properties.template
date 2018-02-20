@@ -1,0 +1,8 @@
+# Elasticsearch plugin descriptor file
+jvm=true
+name=reverse-children-agg
+description=ElasticSearch reverse chidren aggregation plugin
+classname=com.softbridge.elasticsearch.join.ReverseChildrenAggPlugin
+elasticsearch.version=ES-PLUGIN-VERSION
+java.version=1.8
+version=ES-PLUGIN-VERSION

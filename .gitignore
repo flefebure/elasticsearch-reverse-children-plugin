@@ -1,0 +1,8 @@
+# intellij files
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+build/
+build-idea/
