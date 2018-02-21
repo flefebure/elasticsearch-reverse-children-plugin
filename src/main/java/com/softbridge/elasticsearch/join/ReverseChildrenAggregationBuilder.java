@@ -27,6 +27,7 @@ import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.fielddata.plain.SortedSetDVOrdinalsIndexFieldData;
 import org.elasticsearch.index.mapper.DocumentMapper;
+import org.elasticsearch.index.mapper.FieldMapper;
 import org.elasticsearch.index.mapper.MappedFieldType;
 import org.elasticsearch.index.mapper.ParentFieldMapper;
 import org.elasticsearch.search.aggregations.AggregatorFactories.Builder;
@@ -40,7 +41,12 @@ import org.elasticsearch.search.aggregations.support.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.support.ValuesSourceType;
 import org.elasticsearch.search.internal.SearchContext;
 
+import java.beans.IntrospectionException;
+import java.beans.Introspector;
+import java.beans.PropertyDescriptor;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Objects;
 
 public class ReverseChildrenAggregationBuilder
@@ -104,6 +110,8 @@ public class ReverseChildrenAggregationBuilder
 
 
     private void joinFieldResolveConfig(SearchContext context, ValuesSourceConfig<WithOrdinals> config) {
+        // get Mapper by reflection because mappers are in a module classloader
+        /*
         ParentJoinFieldMapper parentJoinFieldMapper = ParentJoinFieldMapper.getMapper(context.mapperService());
         ParentIdFieldMapper parentIdFieldMapper = parentJoinFieldMapper.getParentIdFieldMapper(childType, false);
         if (parentIdFieldMapper != null) {
@@ -115,6 +123,42 @@ public class ReverseChildrenAggregationBuilder
         } else {
             config.unmapped(true);
         }
+        */
+        MappedFieldType fieldType = context.mapperService().fullName("_parent_join");
+
+        if (fieldType != null) {
+            try {
+                Method getMapper = fieldType.getClass().getMethod("getMapper", (Class[])null);
+                FieldMapper parentJoinFieldMapper  = (FieldMapper)getMapper.invoke(fieldType, (Object[])null);
+                Method getParentIdFieldMapper = parentJoinFieldMapper.getClass().getMethod("getParentIdFieldMapper",
+                        String.class,
+                        boolean.class);
+                FieldMapper parentIdFieldMapper = (FieldMapper)getParentIdFieldMapper.invoke(parentJoinFieldMapper,
+                        childType,
+                        false);
+                if (parentIdFieldMapper != null) {
+                    Method getParentFilter = parentIdFieldMapper.getClass().getMethod("getParentFilter", (Class[])null);
+                    parentFilter = (Query)getParentFilter.invoke(parentIdFieldMapper, (Object[])null);
+                    Method getChildFilter = parentIdFieldMapper.getClass().getMethod("getChildFilter", String.class);
+                    childFilter = (Query)getChildFilter.invoke(parentIdFieldMapper, childType);
+                    parentFilter = (Query)getParentFilter.invoke(parentIdFieldMapper, (Object[])null);
+
+                    Method fieldTypeMethod = parentIdFieldMapper.getClass().getMethod("fieldType", (Class[])null);
+                    MappedFieldType fieldType2 = (MappedFieldType)fieldTypeMethod.invoke(parentIdFieldMapper, (Object[])null);
+
+                    final SortedSetDVOrdinalsIndexFieldData fieldData = context.getForField(fieldType2);
+                    config.fieldContext(new FieldContext(fieldType2.name(), fieldData, fieldType2));
+                }
+                else {
+                    config.unmapped(true);
+                }
+
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+
     }
 
     private void parentFieldResolveConfig(SearchContext context, ValuesSourceConfig<WithOrdinals> config) {

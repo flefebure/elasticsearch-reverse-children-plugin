@@ -19,7 +19,7 @@ apply plugin: 'maven-publish'
 group = 'com.softbridge'
 version = '1.0.0-es'+ elasticsearch +"-SNAPSHOT"
 description = "ElasticSearch reverse chidren aggregation plugin"
-
+project.compactProfile='full'
 
 dependencies {
 
