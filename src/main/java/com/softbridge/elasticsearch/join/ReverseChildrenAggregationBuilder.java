@@ -29,8 +29,6 @@ import org.elasticsearch.index.fielddata.plain.SortedSetDVOrdinalsIndexFieldData
 import org.elasticsearch.index.mapper.DocumentMapper;
 import org.elasticsearch.index.mapper.MappedFieldType;
 import org.elasticsearch.index.mapper.ParentFieldMapper;
-import org.elasticsearch.join.mapper.ParentIdFieldMapper;
-import org.elasticsearch.join.mapper.ParentJoinFieldMapper;
 import org.elasticsearch.search.aggregations.AggregatorFactories.Builder;
 import org.elasticsearch.search.aggregations.AggregatorFactory;
 import org.elasticsearch.search.aggregations.support.FieldContext;

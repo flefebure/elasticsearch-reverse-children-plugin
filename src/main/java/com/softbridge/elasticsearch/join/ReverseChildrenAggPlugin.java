@@ -20,12 +20,6 @@
 package com.softbridge.elasticsearch.join;
 
 import org.elasticsearch.index.mapper.Mapper;
-import org.elasticsearch.join.aggregations.ChildrenAggregationBuilder;
-import org.elasticsearch.join.aggregations.InternalChildren;
-import org.elasticsearch.join.mapper.ParentJoinFieldMapper;
-import org.elasticsearch.join.query.HasChildQueryBuilder;
-import org.elasticsearch.join.query.HasParentQueryBuilder;
-import org.elasticsearch.join.query.ParentIdQueryBuilder;
 import org.elasticsearch.plugins.MapperPlugin;
 import org.elasticsearch.plugins.Plugin;
 import org.elasticsearch.plugins.SearchPlugin;
