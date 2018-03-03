@@ -19,19 +19,29 @@
 
 package com.softbridge.elasticsearch.join;
 
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.index.mapper.Mapper;
 import org.elasticsearch.plugins.MapperPlugin;
 import org.elasticsearch.plugins.Plugin;
+import org.elasticsearch.plugins.ScriptPlugin;
 import org.elasticsearch.plugins.SearchPlugin;
+import org.elasticsearch.script.ScriptContext;
+import org.elasticsearch.script.ScriptEngine;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-public class ReverseChildrenAggPlugin extends Plugin implements SearchPlugin, MapperPlugin {
+public class ReverseChildrenAggPlugin extends Plugin implements SearchPlugin, ScriptPlugin {
 
     public ReverseChildrenAggPlugin() {
+    }
+
+    @Override
+    public ScriptEngine getScriptEngine(Settings settings, Collection<ScriptContext<?>> contexts) {
+        return new SoftbridgeScriptEngine();
     }
 
     @Override
