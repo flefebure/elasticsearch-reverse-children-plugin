@@ -56,7 +56,7 @@ esplugin {
     noticeFile rootProject.file('NOTICE.txt')
     name 'reverse-children-agg'
     version rootProject.version
-    description 'ElasticSearch reverse chidren aggregation plugin'
+    description 'ElasticSearch reverse children aggregation plugin'
     classname 'com.softbridge.elasticsearch.join.ReverseChildrenAggPlugin'
     hasClientJar = true
 }
@@ -77,13 +77,13 @@ publishing {
     repositories {
         maven {
             credentials {
-                username 'admin'
-                password 'softbridge2015'
+                username "${userRepo}"
+                password "${passwordRepo}"
             }
             if(project.version.toString().endsWith('-SNAPSHOT')) {
-                url "http://forge.softbridge.fr:8081/artifactory/libs-snapshot-local"
+                url "${snapshotsRepo}"
             } else {
-                url "http://forge.softbridge.fr:8081/artifactory/libs-release-local"
+                url "${sreleasesRepo}"
             }
         }
     }
