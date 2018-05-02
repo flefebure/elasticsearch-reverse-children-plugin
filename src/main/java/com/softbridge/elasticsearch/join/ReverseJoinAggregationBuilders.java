@@ -23,7 +23,7 @@ public abstract class ReverseJoinAggregationBuilders {
     /**
      * Create a new {@link ReverseChildren} aggregation with the given name.
      */
-    public static ReverseChildrenAggregationBuilder children(String name, String childType) {
+    public static ReverseChildrenAggregationBuilder reverseChildren(String name, String childType) {
         return new ReverseChildrenAggregationBuilder(name, childType);
     }
 }

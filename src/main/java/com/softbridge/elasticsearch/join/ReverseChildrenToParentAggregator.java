@@ -29,7 +29,9 @@ import org.apache.lucene.search.Weight;
 import org.apache.lucene.util.Bits;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.lease.Releasables;
+import org.elasticsearch.common.lucene.Lucene;
 import org.elasticsearch.common.util.LongArray;
+import org.elasticsearch.common.util.ObjectArray;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.AggregatorFactories;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -41,8 +43,10 @@ import org.elasticsearch.search.aggregations.support.ValuesSource;
 import org.elasticsearch.search.internal.SearchContext;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 // The RecordingPerReaderBucketCollector assumes per segment recording which isn't the case for this
 // aggregation, for this reason that collector can't be used
@@ -55,7 +59,7 @@ public class ReverseChildrenToParentAggregator extends BucketsAggregator impleme
     private final ValuesSource.Bytes.WithOrdinals valuesSource;
 
 
-    private final LongArray childrenOrdToBuckets;
+    private final ObjectArray<Set<Long>> childrenOrdToBuckets;
 
     public ReverseChildrenToParentAggregator(String name, AggregatorFactories factories,
                                              SearchContext context, Aggregator parent, Query childFilter,
@@ -66,8 +70,7 @@ public class ReverseChildrenToParentAggregator extends BucketsAggregator impleme
         // these two filters are cached in the parser
         this.childFilter = context.searcher().createNormalizedWeight(childFilter, false);
         this.parentFilter = context.searcher().createNormalizedWeight(parentFilter, false);
-        this.childrenOrdToBuckets = context.bigArrays().newLongArray(maxOrd, false);
-        this.childrenOrdToBuckets.fill(0, maxOrd, -1);
+        this.childrenOrdToBuckets = context.bigArrays().newObjectArray(maxOrd);
         this.valuesSource = valuesSource;
 
 
@@ -91,19 +94,22 @@ public class ReverseChildrenToParentAggregator extends BucketsAggregator impleme
         if (valuesSource == null) {
             return LeafBucketCollector.NO_OP_COLLECTOR;
         }
-        final SortedSetDocValues globalOrdinals = valuesSource.globalOrdinalsValues(ctx);
-
+        final SortedSetDocValues childrenGlobalOrdinals = valuesSource.globalOrdinalsValues(ctx);
+        final Bits childrenDocs = Lucene.asSequentialAccessBits(ctx.reader().maxDoc(), childFilter.scorerSupplier(ctx));
         return new LeafBucketCollector() {
 
             @Override
             public void collect(int docId, long bucket) throws IOException {
-                if (globalOrdinals.advanceExact(docId)) {
-                    long globalOrdinal = globalOrdinals.nextOrd();
-                    assert globalOrdinals.nextOrd() == SortedSetDocValues.NO_MORE_ORDS;
-                    if (globalOrdinal != -1) {
-                        if (childrenOrdToBuckets.get(globalOrdinal) == -1) {
-                            childrenOrdToBuckets.set(globalOrdinal, bucket);
-                        }
+
+                if (childrenDocs.get(docId) && childrenGlobalOrdinals.advanceExact(docId)) {
+                    long childGlobalOrdinal = childrenGlobalOrdinals.nextOrd();
+                    Set<Long> buckets = childrenOrdToBuckets.get(childGlobalOrdinal);
+                    if (buckets == null) {
+                        buckets = new HashSet<>();
+                        childrenOrdToBuckets.set(childGlobalOrdinal, buckets);
+                    }
+                    if (!buckets.contains(bucket)) {
+                        buckets.add(bucket);
                     }
                 }
             }
@@ -112,34 +118,32 @@ public class ReverseChildrenToParentAggregator extends BucketsAggregator impleme
 
     @Override
     protected void doPostCollection() throws IOException {
+
         IndexReader indexReader = context().searcher().getIndexReader();
         for (LeafReaderContext ctx : indexReader.leaves()) {
+            SortedSetDocValues parentGlobalOrdinals = valuesSource.globalOrdinalsValues(ctx);
             Scorer parentDocsScorer = parentFilter.scorer(ctx);
             if (parentDocsScorer == null) {
                 continue;
             }
             DocIdSetIterator parentDocsIter = parentDocsScorer.iterator();
-
             final LeafBucketCollector sub = collectableSubAggregators.getLeafCollector(ctx);
-
-            final SortedSetDocValues globalOrdinals = valuesSource.globalOrdinalsValues(ctx);
-            // Set the scorer, since we now replay only the child docIds
             sub.setScorer(new ConstantScoreScorer(null, 1f, parentDocsIter));
-
             final Bits liveDocs = ctx.reader().getLiveDocs();
-            for (int docId = parentDocsIter
-                    .nextDoc(); docId != DocIdSetIterator.NO_MORE_DOCS; docId = parentDocsIter
-                            .nextDoc()) {
-                if (liveDocs != null && liveDocs.get(docId) == false) {
+            for (int parentDocId = parentDocsIter
+                    .nextDoc(); parentDocId != DocIdSetIterator.NO_MORE_DOCS; parentDocId = parentDocsIter
+                    .nextDoc()) {
+                if (liveDocs != null && liveDocs.get(parentDocId) == false) {
                     continue;
                 }
-                if (globalOrdinals.advanceExact(docId)) {
-                    long globalOrdinal = globalOrdinals.nextOrd();
-                    assert globalOrdinals.nextOrd() == SortedSetDocValues.NO_MORE_ORDS;
-                    long bucketOrd = childrenOrdToBuckets.get(globalOrdinal);
-                    if (bucketOrd != -1) {
-                        collectBucket(sub, docId, bucketOrd);
-
+                if (parentGlobalOrdinals.advanceExact(parentDocId)) {
+                    long parentGlobalOrdinal = parentGlobalOrdinals.nextOrd();
+                    assert parentGlobalOrdinals.nextOrd() == SortedSetDocValues.NO_MORE_ORDS;
+                    Set<Long> bucketOrds = childrenOrdToBuckets.get(parentGlobalOrdinal);
+                    if (bucketOrds != null) {
+                        for (Long bucketOrd : bucketOrds) {
+                            collectBucket(sub, parentDocId, bucketOrd);
+                        }
                     }
                 }
             }

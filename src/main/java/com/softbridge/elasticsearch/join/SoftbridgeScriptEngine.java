@@ -1,5 +1,6 @@
 package com.softbridge.elasticsearch.join;
 
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.index.CompositeReader;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.Fields;
@@ -8,6 +9,7 @@ import org.apache.lucene.index.MultiFields;
 import org.apache.lucene.index.SortedSetDocValues;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.Terms;
+import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
@@ -16,28 +18,50 @@ import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.Weight;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
+import org.elasticsearch.client.Client;
+import org.elasticsearch.cluster.service.ClusterService;
+import org.elasticsearch.common.io.stream.NamedWriteableRegistry;
+import org.elasticsearch.common.regex.Regex;
+import org.elasticsearch.common.xcontent.NamedXContentRegistry;
+import org.elasticsearch.env.Environment;
+import org.elasticsearch.env.NodeEnvironment;
+import org.elasticsearch.index.IndexModule;
+import org.elasticsearch.index.analysis.NamedAnalyzer;
 import org.elasticsearch.index.fielddata.AtomicOrdinalsFieldData;
 import org.elasticsearch.index.fielddata.IndexFieldData;
 import org.elasticsearch.index.fielddata.IndexOrdinalsFieldData;
 import org.elasticsearch.index.fielddata.ScriptDocValues;
 import org.elasticsearch.index.fielddata.plain.SortedSetDVBytesAtomicFieldData;
 import org.elasticsearch.index.fielddata.plain.SortedSetDVOrdinalsIndexFieldData;
+import org.elasticsearch.index.mapper.AllFieldMapper;
 import org.elasticsearch.index.mapper.MappedFieldType;
 import org.elasticsearch.index.mapper.MapperService;
+import org.elasticsearch.index.query.QueryShardException;
+import org.elasticsearch.index.query.support.QueryParsers;
+import org.elasticsearch.index.search.QueryParserHelper;
+import org.elasticsearch.index.search.QueryStringQueryParser;
+import org.elasticsearch.plugins.Plugin;
 import org.elasticsearch.script.FilterScript;
 import org.elasticsearch.script.ScriptContext;
 import org.elasticsearch.script.ScriptEngine;
+import org.elasticsearch.script.ScriptService;
 import org.elasticsearch.search.lookup.DocLookup;
 import org.elasticsearch.search.lookup.SearchLookup;
+import org.elasticsearch.threadpool.ThreadPool;
+import org.elasticsearch.watcher.ResourceWatcherService;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
-public class SoftbridgeScriptEngine implements ScriptEngine {
+public class SoftbridgeScriptEngine extends Plugin implements ScriptEngine {
     @Override
     public String getType() {
         return "softbridge_script";
     }
+
 
     @Override
     public <T> T compile(String scriptName, String scriptSource, ScriptContext<T> context, Map<String, String> params) {
@@ -115,6 +139,8 @@ public class SoftbridgeScriptEngine implements ScriptEngine {
             }
         }
 
+
+
         @Override
         public boolean execute() {
             Map<String, ScriptDocValues<?>> map = getDoc();
@@ -174,5 +200,10 @@ public class SoftbridgeScriptEngine implements ScriptEngine {
 
             return true;
         }
+    }
+
+    private MultiFieldQueryParser buildQueryParser() {
+        MultiFieldQueryParser multiFieldQueryParser = new MultiFieldQueryParser(new String[]{"role", "action"}, new StandardAnalyzer());
+        return multiFieldQueryParser;
     }
 }
